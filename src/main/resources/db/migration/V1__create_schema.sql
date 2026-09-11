@@ -100,9 +100,7 @@ CREATE TABLE treatments (
                                 REFERENCES specialists (id)
 );
 
--- =====================================================
--- Paso 16: índices
--- =====================================================
+
 CREATE INDEX idx_rescue_cases_center_id   ON rescue_cases (rescue_center_id);
 CREATE INDEX idx_rescue_cases_status      ON rescue_cases (status);
 CREATE INDEX idx_rescue_cases_rescue_date ON rescue_cases (rescue_date);
