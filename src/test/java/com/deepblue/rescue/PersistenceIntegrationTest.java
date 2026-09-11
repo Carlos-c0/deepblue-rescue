@@ -964,4 +964,191 @@ class PersistenceIntegrationTest {
                 .extracting(Treatment::getType)
                 .containsExactly(TreatmentType.WOUND_CARE);
     }
+
+    @Test
+    void reto_sin_guia_animals_in_rehab_with_trauma_specialist() {
+        // Animal 1: en rehabilitación, tratado por Elena (Trauma) → debe aparecer
+        RescueCenter center1 = new RescueCenter(
+                "DB-CAR",
+                "DeepBlue Caribbean",
+                "Santa Marta"
+        );
+
+        RescueCase case1 = new RescueCase(
+                "RES-A-001",
+                LocalDate.of(2026, 8, 10),
+                "Bahía Concha",
+                RescueStatus.IN_REHABILITATION
+        );
+
+        Animal animal1 = new Animal(
+                "AN-A-001",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.FEMALE
+        );
+
+        center1.addCase(case1);
+        case1.assignAnimal(animal1);
+        rescueCenterRepository.save(center1);
+
+        // Animal 2: en rehabilitación, tratado por Sofia (Trauma) → debe aparecer
+        RescueCenter center2 = new RescueCenter(
+                "DB-PAC",
+                "DeepBlue Pacific",
+                "Buenaventura"
+        );
+
+        RescueCase case2 = new RescueCase(
+                "RES-A-002",
+                LocalDate.of(2026, 8, 11),
+                "Malpelo",
+                RescueStatus.IN_REHABILITATION
+        );
+
+        Animal animal2 = new Animal(
+                "AN-A-002",
+                "Humpback Whale",
+                "Megaptera novaeangliae",
+                AnimalSex.MALE
+        );
+
+        center2.addCase(case2);
+        case2.assignAnimal(animal2);
+        rescueCenterRepository.save(center2);
+
+        // Animal 3: NO en rehabilitación, tratado por Elena (Trauma) → NO debe aparecer
+        RescueCenter center3 = new RescueCenter(
+                "DB-ATL",
+                "DeepBlue Atlantic",
+                "Cartagena"
+        );
+
+        RescueCase case3 = new RescueCase(
+                "RES-A-003",
+                LocalDate.of(2026, 8, 12),
+                "Isla Fuerte",
+                RescueStatus.RELEASED
+        );
+
+        Animal animal3 = new Animal(
+                "AN-A-003",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.MALE
+        );
+
+        center3.addCase(case3);
+        case3.assignAnimal(animal3);
+        rescueCenterRepository.save(center3);
+
+        // Animal 4: en rehabilitación, tratado por Mateo (sin Trauma) → NO debe aparecer
+        RescueCenter center4 = new RescueCenter(
+                "DB-SAN",
+                "DeepBlue San Andrés",
+                "San Andrés"
+        );
+
+        RescueCase case4 = new RescueCase(
+                "RES-A-004",
+                LocalDate.of(2026, 8, 13),
+                "Johnny Cay",
+                RescueStatus.IN_REHABILITATION
+        );
+
+        Animal animal4 = new Animal(
+                "AN-A-004",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.FEMALE
+        );
+
+        center4.addCase(case4);
+        case4.assignAnimal(animal4);
+        rescueCenterRepository.save(center4);
+
+        // Expertise
+        Expertise trauma = expertiseRepository
+                .findByNameIgnoreCase("Trauma").orElseThrow();
+        Expertise marineMammals = expertiseRepository
+                .findByNameIgnoreCase("Marine Mammals").orElseThrow();
+        Expertise marineBirds = expertiseRepository
+                .findByNameIgnoreCase("Marine Birds").orElseThrow();
+
+        // Especialistas
+        Specialist elena = new Specialist(
+                "SPEC-A-001",
+                "Elena",
+                "Vargas",
+                "elena.trauma@deepblue.org"
+        );
+        elena.addExpertise(trauma);
+
+        Specialist sofia = new Specialist(
+                "SPEC-A-002",
+                "Sofia",
+                "Lozano",
+                "sofia.trauma@deepblue.org"
+        );
+        sofia.addExpertise(marineBirds);
+        sofia.addExpertise(trauma);
+
+        Specialist mateo = new Specialist(
+                "SPEC-A-003",
+                "Mateo",
+                "Rojas",
+                "mateo.notrauma@deepblue.org"
+        );
+        mateo.addExpertise(marineMammals);
+
+        specialistRepository.saveAll(List.of(elena, sofia, mateo));
+
+        // Tratamientos
+        Treatment t1 = new Treatment(
+                animal1,
+                elena,
+                LocalDateTime.of(2026, 8, 18, 10, 0),
+                TreatmentType.WOUND_CARE,
+                "Animal 1 by Elena"
+        );
+
+        Treatment t2 = new Treatment(
+                animal2,
+                sofia,
+                LocalDateTime.of(2026, 8, 18, 11, 0),
+                TreatmentType.WOUND_CARE,
+                "Animal 2 by Sofia"
+        );
+
+        Treatment t3 = new Treatment(
+                animal3,
+                elena,
+                LocalDateTime.of(2026, 8, 18, 12, 0),
+                TreatmentType.WOUND_CARE,
+                "Animal 3 by Elena"
+        );
+
+        Treatment t4 = new Treatment(
+                animal4,
+                mateo,
+                LocalDateTime.of(2026, 8, 18, 13, 0),
+                TreatmentType.WOUND_CARE,
+                "Animal 4 by Mateo"
+        );
+
+        treatmentRepository.saveAll(List.of(t1, t2, t3, t4));
+
+        // Ejecutar la consulta del reto
+        List<Animal> result =
+                animalRepository.findDistinctByStatusAndTreatmentExpertise(
+                        RescueStatus.IN_REHABILITATION,
+                        "trauma"  // minúscula: probar IgnoreCase
+                );
+
+        assertThat(result)
+                .hasSize(2)
+                .extracting(Animal::getAnimalCode)
+                .containsExactlyInAnyOrder("AN-A-001", "AN-A-002");
+    }
+
 }
