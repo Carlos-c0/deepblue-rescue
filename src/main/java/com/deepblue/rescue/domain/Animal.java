@@ -1,5 +1,6 @@
 package com.deepblue.rescue.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -9,8 +10,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "animals")
@@ -42,6 +47,17 @@ public class Animal {
     )
     private RescueCase rescueCase;
 
+    @OneToOne(
+            mappedBy = "animal",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    private MedicalRecord medicalRecord;
+
+    @OneToMany(mappedBy = "animal")
+    private List<Treatment> treatments = new ArrayList<>();
+
     protected Animal() {
     }
 
@@ -53,6 +69,13 @@ public class Animal {
         this.commonName = commonName;
         this.scientificName = scientificName;
         this.sex = sex;
+    }
+
+    public void assignMedicalRecord(MedicalRecord medicalRecord) {
+        this.medicalRecord = medicalRecord;
+        if (medicalRecord != null) {
+            medicalRecord.setAnimal(this);
+        }
     }
 
     public Long getId() {
@@ -81,5 +104,13 @@ public class Animal {
 
     public void setRescueCase(RescueCase rescueCase) {
         this.rescueCase = rescueCase;
+    }
+
+    public MedicalRecord getMedicalRecord() {
+        return medicalRecord;
+    }
+
+    public List<Treatment> getTreatments() {
+        return treatments;
     }
 }
