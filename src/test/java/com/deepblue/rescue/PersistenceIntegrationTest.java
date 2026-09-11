@@ -1,5 +1,7 @@
 package com.deepblue.rescue;
+import org.springframework.dao.DataIntegrityViolationException;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.deepblue.rescue.domain.Animal;
 import com.deepblue.rescue.domain.AnimalSex;
 import com.deepblue.rescue.domain.Expertise;
@@ -671,6 +673,59 @@ class PersistenceIntegrationTest {
                 .hasSize(1)
                 .extracting(Treatment::getDescription)
                 .containsExactly("Inside range");
+    }
+
+    @Test
+    void unique_animal_code_violation_throws_DataIntegrityViolationException() {
+        RescueCenter center1 = new RescueCenter(
+                "DB-CAR-1",
+                "DeepBlue Caribbean Center 1",
+                "Santa Marta"
+        );
+
+        RescueCase rescueCase1 = new RescueCase(
+                "RES-2026-901",
+                LocalDate.of(2026, 8, 10),
+                "Bahía Concha",
+                RescueStatus.ADMITTED
+        );
+
+        Animal animal1 = new Animal(
+                "AN-100",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.FEMALE
+        );
+
+        center1.addCase(rescueCase1);
+        rescueCase1.assignAnimal(animal1);
+        rescueCenterRepository.saveAndFlush(center1);
+
+        RescueCenter center2 = new RescueCenter(
+                "DB-CAR-2",
+                "DeepBlue Caribbean Center 2",
+                "Taganga"
+        );
+
+        RescueCase rescueCase2 = new RescueCase(
+                "RES-2026-902",
+                LocalDate.of(2026, 8, 12),
+                "Taganga",
+                RescueStatus.ADMITTED
+        );
+
+        Animal animal2 = new Animal(
+                "AN-100",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.MALE
+        );
+
+        center2.addCase(rescueCase2);
+        rescueCase2.assignAnimal(animal2);
+
+        assertThatThrownBy(() -> rescueCenterRepository.saveAndFlush(center2))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
 }
