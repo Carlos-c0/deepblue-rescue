@@ -1,7 +1,5 @@
 package com.deepblue.rescue;
-import org.springframework.dao.DataIntegrityViolationException;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.deepblue.rescue.domain.Animal;
 import com.deepblue.rescue.domain.AnimalSex;
 import com.deepblue.rescue.domain.Expertise;
@@ -22,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -34,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 @SpringBootTest
@@ -728,4 +728,240 @@ class PersistenceIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    // ========================================================
+    // Reto integrador
+    // ========================================================
+
+    private Animal persistFullScenario() {
+        RescueCenter center = new RescueCenter(
+                "DB-CAR",
+                "DeepBlue Caribbean",
+                "Santa Marta"
+        );
+
+        RescueCase rescueCase = new RescueCase(
+                "RES-2026-100",
+                LocalDate.of(2026, 8, 18),
+                "Bahía Concha",
+                RescueStatus.IN_REHABILITATION
+        );
+
+        Animal animal = new Animal(
+                "AN-2026-100",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.FEMALE
+        );
+
+        MedicalRecord record = new MedicalRecord(
+                new BigDecimal("27.80"),
+                "STABLE",
+                "Injury caused by fishing net",
+                "Possible plastic ingestion"
+        );
+
+        center.addCase(rescueCase);
+        rescueCase.assignAnimal(animal);
+        animal.assignMedicalRecord(record);
+        rescueCenterRepository.save(center);
+
+        Expertise marineReptiles = expertiseRepository
+                .findByNameIgnoreCase("Marine Reptiles").orElseThrow();
+        Expertise trauma = expertiseRepository
+                .findByNameIgnoreCase("Trauma").orElseThrow();
+        Expertise rehabilitation = expertiseRepository
+                .findByNameIgnoreCase("Rehabilitation").orElseThrow();
+
+        Specialist elena = new Specialist(
+                "SPEC-001",
+                "Elena",
+                "Vargas",
+                "elena@deepblue.org"
+        );
+
+        elena.addExpertise(marineReptiles);
+        elena.addExpertise(trauma);
+        elena.addExpertise(rehabilitation);
+        specialistRepository.save(elena);
+
+        Treatment t1 = new Treatment(
+                animal,
+                elena,
+                LocalDateTime.of(2026, 8, 18, 10, 0),
+                TreatmentType.WOUND_CARE,
+                "Cleaning of left front flipper"
+        );
+
+        Treatment t2 = new Treatment(
+                animal,
+                elena,
+                LocalDateTime.of(2026, 8, 19, 10, 0),
+                TreatmentType.HYDRATION,
+                "Subcutaneous fluid therapy"
+        );
+
+        treatmentRepository.saveAll(List.of(t1, t2));
+
+        return animal;
+    }
+
+    @Test
+    void reto_integrador_persist_full_scenario() {
+        Animal animal = persistFullScenario();
+
+        assertThat(animal.getId()).isNotNull();
+
+        RescueCenter foundCenter =
+                rescueCenterRepository.findByCode("DB-CAR")
+                        .orElseThrow();
+
+        RescueCase foundCase =
+                rescueCaseRepository.findByCaseCode("RES-2026-100")
+                        .orElseThrow();
+
+        Animal foundAnimal =
+                animalRepository.findByAnimalCode("AN-2026-100")
+                        .orElseThrow();
+
+        List<Specialist> allSpecialists = specialistRepository.findAll();
+
+        assertThat(allSpecialists).hasSize(1);
+
+        Specialist foundElena = allSpecialists.get(0);
+
+        List<Treatment> foundTreatments =
+                treatmentRepository.findByAnimalIdOrderByPerformedAtAsc(
+                        foundAnimal.getId()
+                );
+
+        assertThat(foundCenter.getCity()).isEqualTo("Santa Marta");
+        assertThat(foundCase.getStatus())
+                .isEqualTo(RescueStatus.IN_REHABILITATION);
+        assertThat(foundAnimal.getCommonName()).isEqualTo("Green Sea Turtle");
+        assertThat(foundAnimal.getMedicalRecord().getInitialWeight())
+                .isEqualByComparingTo("27.80");
+        assertThat(foundElena.getExpertiseAreas())
+                .hasSize(3)
+                .extracting(Expertise::getName)
+                .containsExactlyInAnyOrder(
+                        "Marine Reptiles", "Trauma", "Rehabilitation"
+                );
+        assertThat(foundTreatments)
+                .hasSize(2)
+                .extracting(Treatment::getType)
+                .containsExactly(
+                        TreatmentType.WOUND_CARE,
+                        TreatmentType.HYDRATION
+                );
+    }
+
+    @Test
+    void consulta_1_case_exists() {
+        persistFullScenario();
+
+        assertThat(rescueCaseRepository.findByCaseCode("RES-2026-100"))
+                .isPresent();
+    }
+
+    @Test
+    void consulta_2_cases_in_rehabilitation() {
+        persistFullScenario();
+
+        List<RescueCase> cases = rescueCaseRepository
+                .findByStatusOrderByRescueDateAsc(RescueStatus.IN_REHABILITATION);
+
+        assertThat(cases)
+                .hasSize(1)
+                .extracting(RescueCase::getCaseCode)
+                .containsExactly("RES-2026-100");
+    }
+
+    @Test
+    void consulta_3_animals_in_db_car() {
+        persistFullScenario();
+
+        List<Animal> animals =
+                animalRepository.findByRescueCaseRescueCenterCode("DB-CAR");
+
+        assertThat(animals)
+                .hasSize(1)
+                .extracting(Animal::getAnimalCode)
+                .containsExactly("AN-2026-100");
+    }
+
+    @Test
+    void consulta_4_animals_containing_turtle() {
+        persistFullScenario();
+
+        List<Animal> animals =
+                animalRepository.findByCommonNameContainingIgnoreCase("turtle");
+
+        assertThat(animals)
+                .hasSize(1)
+                .extracting(Animal::getAnimalCode)
+                .containsExactly("AN-2026-100");
+    }
+
+    @Test
+    void consulta_5_specialists_with_trauma() {
+        persistFullScenario();
+
+        List<Specialist> specialists =
+                specialistRepository.findActiveByExpertise("Trauma");
+
+        assertThat(specialists)
+                .hasSize(1)
+                .extracting(Specialist::getProfessionalCode)
+                .containsExactly("SPEC-001");
+    }
+
+    @Test
+    void consulta_6_treatments_of_animal() {
+        Animal animal = persistFullScenario();
+
+        List<Treatment> treatments =
+                treatmentRepository.findByAnimalIdOrderByPerformedAtAsc(
+                        animal.getId()
+                );
+
+        assertThat(treatments)
+                .hasSize(2)
+                .extracting(Treatment::getType)
+                .containsExactly(
+                        TreatmentType.WOUND_CARE,
+                        TreatmentType.HYDRATION
+                );
+    }
+
+    @Test
+    void consulta_7_treatments_by_specialist_expertise() {
+        persistFullScenario();
+
+        List<Treatment> treatments =
+                treatmentRepository.findBySpecialistExpertise("Rehabilitation");
+
+        assertThat(treatments)
+                .hasSize(2)
+                .extracting(Treatment::getType)
+                .containsExactlyInAnyOrder(
+                        TreatmentType.WOUND_CARE,
+                        TreatmentType.HYDRATION
+                );
+    }
+
+    @Test
+    void consulta_8_treatments_between_dates() {
+        persistFullScenario();
+
+        LocalDateTime start = LocalDateTime.of(2026, 8, 18, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2026, 8, 18, 23, 59, 59);
+
+        List<Treatment> treatments =
+                treatmentRepository.findBetweenDates(start, end);
+
+        assertThat(treatments)
+                .hasSize(1)
+                .extracting(Treatment::getType)
+                .containsExactly(TreatmentType.WOUND_CARE);
+    }
 }
