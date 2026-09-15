@@ -12,6 +12,8 @@ public interface TreatmentRepository extends JpaRepository<Treatment, Long> {
 
     List<Treatment> findByAnimalIdOrderByPerformedAtAsc(Long animalId);
 
+    List<Treatment> findByAnimalAnimalCodeOrderByPerformedAtAsc(String animalCode);
+
     @Query("""
             select t
             from Treatment t
