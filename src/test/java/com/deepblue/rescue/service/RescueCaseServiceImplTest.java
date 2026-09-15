@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.deepblue.rescue.exception.BusinessRuleException;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -124,4 +125,33 @@ class RescueCaseServiceImplTest {
         verify(repository).save(rescueCase);
         verify(mapper).toResponse(rescueCase);
     }
+
+    @Test
+    void shouldThrowBusinessRuleExceptionWhenTransitionIsInvalid() {
+        // Arrange
+        RescueCase rescueCase = new RescueCase(
+                "RES-001",
+                LocalDate.of(2026, 8, 18),
+                "Bahía Concha",
+                RescueStatus.ADMITTED
+        );
+
+        ChangeRescueStatusRequest request =
+                new ChangeRescueStatusRequest(RescueStatus.READY_FOR_RELEASE);
+
+        when(repository.findByCaseCode("RES-001"))
+                .thenReturn(Optional.of(rescueCase));
+
+        assertThatThrownBy(() ->
+                service.changeStatus("RES-001", request)
+        )
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("ADMITTED")
+                .hasMessageContaining("READY_FOR_RELEASE");
+
+        verify(repository).findByCaseCode("RES-001");
+        verify(repository, never()).save(any());
+        verify(mapper, never()).toResponse(any());
+    }
+
 }

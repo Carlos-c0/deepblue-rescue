@@ -66,6 +66,9 @@ class TreatmentServiceImplTest {
                 AnimalSex.FEMALE
         );
 
+        // 👇 ESTA línea faltaba — enlaza animal ↔ rescueCase
+        rescueCase.assignAnimal(animal);
+
         Specialist specialist = new Specialist(
                 "SPEC-001",
                 "Elena",
@@ -100,7 +103,7 @@ class TreatmentServiceImplTest {
                 .thenReturn(Optional.of(specialist));
 
         when(treatmentRepository.save(any(Treatment.class)))
-                .thenReturn(null);
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         when(mapper.toResponse(any(Treatment.class)))
                 .thenReturn(expectedResponse);
@@ -149,6 +152,55 @@ class TreatmentServiceImplTest {
         assertThatThrownBy(() -> service.register(request))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("SPEC-001");
+
+        verify(animalRepository).findByAnimalCode("AN-001");
+        verify(specialistRepository).findByProfessionalCode("SPEC-001");
+        verify(treatmentRepository, never()).save(any(Treatment.class));
+        verify(mapper, never()).toResponse(any(Treatment.class));
+    }
+
+    @Test
+    void shouldThrowBusinessRuleExceptionWhenCaseIsReleased() {
+        RescueCase rescueCase = new RescueCase(
+                "RES-001",
+                LocalDate.of(2026, 8, 18),
+                "Bahía Concha",
+                RescueStatus.RELEASED
+        );
+
+        Animal animal = new Animal(
+                "AN-001",
+                "Green Sea Turtle",
+                "Chelonia mydas",
+                AnimalSex.FEMALE
+        );
+
+        rescueCase.assignAnimal(animal);
+
+        Specialist specialist = new Specialist(
+                "SPEC-001",
+                "Elena",
+                "Vargas",
+                "elena@deepblue.org"
+        );
+
+        CreateTreatmentRequest request = new CreateTreatmentRequest(
+                "AN-001",
+                "SPEC-001",
+                LocalDateTime.of(2026, 8, 19, 9, 0),
+                TreatmentType.OBSERVATION,
+                "General observation"
+        );
+
+        when(animalRepository.findByAnimalCode("AN-001"))
+                .thenReturn(Optional.of(animal));
+
+        when(specialistRepository.findByProfessionalCode("SPEC-001"))
+                .thenReturn(Optional.of(specialist));
+
+        assertThatThrownBy(() -> service.register(request))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("RELEASED");
 
         verify(animalRepository).findByAnimalCode("AN-001");
         verify(specialistRepository).findByProfessionalCode("SPEC-001");
