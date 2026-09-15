@@ -9,6 +9,8 @@ import com.deepblue.rescue.repository.RescueCaseRepository;
 import com.deepblue.rescue.service.RescueCaseService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.deepblue.rescue.domain.RescueCase;
+import com.deepblue.rescue.exception.BusinessRuleException;
 
 import java.util.List;
 
@@ -50,7 +52,29 @@ public class RescueCaseServiceImpl implements RescueCaseService {
     @Transactional
     public RescueCaseResponse changeStatus(String caseCode,
                                            ChangeRescueStatusRequest request) {
-        throw new UnsupportedOperationException("TODO: Paso 19");
+
+        RescueCase rescueCase = repository
+                .findByCaseCode(caseCode)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Rescue case not found: " + caseCode
+                ));
+
+        RescueStatus currentStatus = rescueCase.getStatus();
+
+        RescueStatus nextStatus = request.status();
+
+        if (!isValidTransition(currentStatus, nextStatus)) {
+            throw new BusinessRuleException(
+                    "Invalid status transition from "
+                            + currentStatus + " to " + nextStatus
+            );
+        }
+
+        rescueCase.setStatus(nextStatus);
+
+        RescueCase saved = repository.save(rescueCase);
+
+        return mapper.toResponse(saved);
     }
 
     private boolean isValidTransition(RescueStatus current,
