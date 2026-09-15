@@ -1,8 +1,8 @@
 package com.deepblue.rescue.service;
 
 import com.deepblue.rescue.domain.RescueCase;
-import com.deepblue.rescue.domain.RescueCenter;
 import com.deepblue.rescue.domain.RescueStatus;
+import com.deepblue.rescue.dto.request.ChangeRescueStatusRequest;
 import com.deepblue.rescue.dto.response.RescueCaseResponse;
 import com.deepblue.rescue.exception.ResourceNotFoundException;
 import com.deepblue.rescue.mapper.RescueCaseMapper;
@@ -38,7 +38,6 @@ class RescueCaseServiceImplTest {
 
     @Test
     void shouldFindRescueCaseByCode() {
-
         RescueCase rescueCase = new RescueCase(
                 "RES-001",
                 LocalDate.of(2026, 8, 18),
@@ -72,7 +71,6 @@ class RescueCaseServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundExceptionWhenNotFound() {
-
         when(repository.findByCaseCode("RES-999"))
                 .thenReturn(Optional.empty());
 
@@ -82,5 +80,48 @@ class RescueCaseServiceImplTest {
 
         verify(repository).findByCaseCode("RES-999");
         verify(mapper, never()).toResponse(any());
+    }
+
+    @Test
+    void shouldChangeStatusWhenTransitionIsValid() {
+        RescueCase rescueCase = new RescueCase(
+                "RES-001",
+                LocalDate.of(2026, 8, 18),
+                "Bahía Concha",
+                RescueStatus.ADMITTED
+        );
+
+        ChangeRescueStatusRequest request =
+                new ChangeRescueStatusRequest(RescueStatus.UNDER_EVALUATION);
+
+        RescueCaseResponse expectedResponse = new RescueCaseResponse(
+                1L,
+                "RES-001",
+                LocalDate.of(2026, 8, 18),
+                "Bahía Concha",
+                RescueStatus.UNDER_EVALUATION,
+                "DB-CAR",
+                null
+        );
+
+        when(repository.findByCaseCode("RES-001"))
+                .thenReturn(Optional.of(rescueCase));
+
+        when(repository.save(rescueCase))
+                .thenReturn(rescueCase);
+
+        when(mapper.toResponse(rescueCase))
+                .thenReturn(expectedResponse);
+
+        RescueCaseResponse result =
+                service.changeStatus("RES-001", request);
+
+        assertThat(result).isEqualTo(expectedResponse);
+        assertThat(rescueCase.getStatus())
+                .isEqualTo(RescueStatus.UNDER_EVALUATION);
+
+        verify(repository).findByCaseCode("RES-001");
+        verify(repository).save(rescueCase);
+        verify(mapper).toResponse(rescueCase);
     }
 }
