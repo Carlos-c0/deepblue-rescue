@@ -4,6 +4,7 @@ import com.deepblue.rescue.domain.RescueCase;
 import com.deepblue.rescue.domain.RescueCenter;
 import com.deepblue.rescue.domain.RescueStatus;
 import com.deepblue.rescue.dto.response.RescueCaseResponse;
+import com.deepblue.rescue.exception.ResourceNotFoundException;
 import com.deepblue.rescue.mapper.RescueCaseMapper;
 import com.deepblue.rescue.repository.RescueCaseRepository;
 import com.deepblue.rescue.service.impl.RescueCaseServiceImpl;
@@ -17,6 +18,9 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,12 +38,6 @@ class RescueCaseServiceImplTest {
 
     @Test
     void shouldFindRescueCaseByCode() {
-        // Arrange
-        RescueCenter center = new RescueCenter(
-                "DB-CAR",
-                "DeepBlue Caribbean",
-                "Santa Marta"
-        );
 
         RescueCase rescueCase = new RescueCase(
                 "RES-001",
@@ -70,5 +68,19 @@ class RescueCaseServiceImplTest {
 
         verify(repository).findByCaseCode("RES-001");
         verify(mapper).toResponse(rescueCase);
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundExceptionWhenNotFound() {
+
+        when(repository.findByCaseCode("RES-999"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findByCode("RES-999"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("RES-999");
+
+        verify(repository).findByCaseCode("RES-999");
+        verify(mapper, never()).toResponse(any());
     }
 }
