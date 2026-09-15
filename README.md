@@ -88,3 +88,38 @@ Una vez aplicada, una migración no se toca. Si hay que cambiar algo, va en una 
 
     Tests run: 24, Failures: 0, Errors: 0, Skipped: 0
     BUILD SUCCESS
+
+## Capa de Servicio
+
+Encima de la capa de persistencia, el proyecto incluye una capa de servicio que:
+
+- Aplica reglas de negocio.
+- Orquesta múltiples repositories.
+- Controla transacciones.
+- Transforma entidades a DTOs con MapStruct.
+
+### Servicios implementados
+
+- **RescueCaseService**
+    - `findByCode(String)` — busca un caso por código
+    - `findByStatus(RescueStatus)` — lista casos según estado
+    - `changeStatus(String, ChangeRescueStatusRequest)` — cambia estado con validación de transición
+
+- **TreatmentService**
+    - `register(CreateTreatmentRequest)` — registra un tratamiento con 5 reglas de negocio
+    - `findByAnimalCode(String)` — lista tratamientos de un animal
+
+- **AnimalService**
+    - `findByCode(String)` — busca animal por código
+    - `findAnimalsInRehabilitation()` — lista animales en rehabilitación
+    - `canReceiveTreatment(String)` — indica si un animal puede recibir tratamientos
+
+### Tests
+
+Unit tests con JUnit + Mockito + AssertJ, sin base de datos:
+
+- `RescueCaseServiceImplTest` — 4 tests
+- `TreatmentServiceImplTest` — 4 tests
+- `AnimalServiceImplTest` — 7 tests
+
+Total: 15 unit tests + 24 integration tests del laboratorio anterior.
