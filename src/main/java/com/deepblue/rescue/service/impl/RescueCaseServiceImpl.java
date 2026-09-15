@@ -52,4 +52,15 @@ public class RescueCaseServiceImpl implements RescueCaseService {
                                            ChangeRescueStatusRequest request) {
         throw new UnsupportedOperationException("TODO: Paso 19");
     }
+
+    private boolean isValidTransition(RescueStatus current,
+                                      RescueStatus next) {
+        return switch (current) {
+            case ADMITTED -> next == RescueStatus.UNDER_EVALUATION;
+            case UNDER_EVALUATION -> next == RescueStatus.IN_REHABILITATION;
+            case IN_REHABILITATION -> next == RescueStatus.READY_FOR_RELEASE;
+            case READY_FOR_RELEASE -> next == RescueStatus.RELEASED;
+            default -> false;
+        };
+    }
 }
