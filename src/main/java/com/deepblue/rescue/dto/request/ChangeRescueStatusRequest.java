@@ -1,4 +1,10 @@
 package com.deepblue.rescue.dto.request;
 
-public class ChangeRescueStatusRequest {
+import com.deepblue.rescue.domain.RescueStatus;
+
+public record ChangeRescueStatusRequest(
+
+        RescueStatus status
+
+) {
 }
