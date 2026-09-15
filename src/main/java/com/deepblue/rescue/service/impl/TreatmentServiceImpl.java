@@ -39,6 +39,10 @@ public class TreatmentServiceImpl implements TreatmentService {
 
     @Override
     public List<TreatmentResponse> findByAnimalCode(String animalCode) {
-        throw new UnsupportedOperationException("TODO: Paso 24");
+        return treatmentRepository
+                .findByAnimalAnimalCodeOrderByPerformedAtAsc(animalCode)
+                .stream()
+                .map(mapper::toResponse)
+                .toList();
     }
 }
