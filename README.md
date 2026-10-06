@@ -123,3 +123,86 @@ Unit tests con JUnit + Mockito + AssertJ, sin base de datos:
 - `AnimalServiceImplTest` — 7 tests
 
 Total: 15 unit tests + 24 integration tests del laboratorio anterior.
+
+## Capa de controladores (laboratorio 3)
+
+Expone por HTTP las operaciones de la capa Service mediante una API REST. Los controllers solo traducen HTTP hacia la aplicación: no contienen reglas de negocio, no usan Repository y nunca retornan entidades, solo DTOs.
+
+```
+HTTP Request → Controller → Service → Repository → PostgreSQL
+HTTP Response ← Controller ← Response DTO ← Service
+```
+
+### Endpoints
+
+| Método | Endpoint | Operación | Respuesta |
+|---|---|---|---|
+| GET | `/api/rescue-cases/{caseCode}` | Consultar caso | 200 |
+| GET | `/api/rescue-cases?status=...` | Buscar casos por estado | 200 |
+| PATCH | `/api/rescue-cases/{caseCode}/status` | Cambiar estado del caso | 200 |
+| GET | `/api/animals/{animalCode}` | Consultar animal | 200 |
+| GET | `/api/animals/in-rehabilitation` | Animales en rehabilitación | 200 |
+| GET | `/api/animals/{animalCode}/treatments` | Tratamientos del animal | 200 |
+| GET | `/api/animals/{animalCode}/treatment-eligibility` | Elegibilidad para tratamiento | 200 |
+| POST | `/api/treatments` | Registrar tratamiento | 201 |
+
+Los 8 métodos de `RescueCaseService`, `TreatmentService` y `AnimalService` quedan expuestos.
+
+### Validación de entrada
+
+Los DTOs de request usan Bean Validation (`@Valid`):
+
+- `ChangeRescueStatusRequest`: `status` obligatorio.
+- `CreateTreatmentRequest`: `animalCode` y `specialistCode` no vacíos, `performedAt` obligatorio y no futuro, `type` obligatorio y `description` de 10 a 500 caracteres.
+
+La validación de entrada se hace en el DTO. Las reglas de negocio (animal liberado, especialista inactivo, transición de estado inválida) se hacen en el Service.
+
+### Contrato de errores
+
+Todos los errores usan la misma estructura (`ErrorResponse`), generada por `GlobalExceptionHandler` (`@RestControllerAdvice`):
+
+```json
+{
+  "timestamp": "2026-10-06T14:00:00",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Animal not found: AN-999",
+  "details": {}
+}
+```
+
+| Situación | HTTP | Excepción |
+|---|---|---|
+| DTO inválido | 400 | `MethodArgumentNotValidException` |
+| JSON mal formado o enum inválido en el body | 400 | `HttpMessageNotReadableException` |
+| Query parameter inválido | 400 | `MethodArgumentTypeMismatchException` |
+| Recurso inexistente | 404 | `ResourceNotFoundException` |
+| Regla de negocio incumplida | 409 | `BusinessRuleException` |
+| Error inesperado | 500 | `Exception` (sin exponer detalles internos) |
+
+En errores de validación, `details` indica qué campo falló y por qué.
+
+### Pruebas
+
+Los tests de controller usan `@WebMvcTest`, `@MockitoBean` y `MockMvc`. Verifican URL, método HTTP, JSON, validación, códigos de estado, cuerpo de error y delegación al Service (incluyendo `verify(..., never())` cuando la validación falla). No necesitan Docker ni PostgreSQL.
+
+```bash
+mvn test -Dtest="*ControllerTest"
+```
+
+Para ejecutar todas las pruebas del proyecto (incluidas las de Repository, que usan Testcontainers) se necesita Docker:
+
+```bash
+mvn clean test
+```
+
+### Estructura agregada
+
+```
+src/main/java/com/deepblue/rescue
+├── controller   RescueCaseController, TreatmentController, AnimalController
+├── dto
+│   ├── request  ChangeRescueStatusRequest, CreateTreatmentRequest
+│   └── response ErrorResponse, TreatmentEligibilityResponse, ...
+└── exception    ResourceNotFoundException, BusinessRuleException, GlobalExceptionHandler
+```
